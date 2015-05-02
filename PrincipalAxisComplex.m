@@ -36,7 +36,7 @@ GetPrincipalAxis[cluster_] := Module[
   principalDimension = Last[Ordering[Variance[cluster]]];
   shift = Shift[cluster];
   initialDirection = IdentityMatrix[dim][[principalDimension]];
-  FixedPoint[Normalize[Total[shift.#*shift]] &, initialDirection, 50]
+  FixedPoint[Normalize[Total[shift.# * shift]] &, initialDirection, 50]
 ];
 
 PartitionCluster[address_, cluster_List, limit_, p_] := Module[
@@ -53,39 +53,37 @@ PartitionCluster[address_, cluster_List, limit_, p_] := Module[
 
   If[len < limit,
 
-    Sow[cluster];
-    GoDownL[address] = address;
-    GoDownR[address] = address;
+    ((* then *)
+      Sow[cluster];
+      GoDownL[address] = address;
+      GoDownR[address] = address;
+    ),
 
-    ,
+    ((* else *)
+      shift = Shift[cluster];
+      paxis = GetPrincipalAxis[cluster];
+      projection = shift.paxis;
+      order = Ordering[projection];
+      data = projection[[order]];
+      separations = Differences[data];
 
-    shift = Shift[cluster];
-    paxis = GetPrincipalAxis[cluster];
-    projection = shift.paxis;
-    order = Ordering[projection];
-    data = projection[[order]];
-    separations = Differences[data];
+      lowerBound = Ceiling[p / 2 * len];
+      upperBound = Ceiling[(1 - p / 2) * len];
+      largestGap = Last[Ordering[separations]];
+      splitLocation = If[lowerBound <= largestGap <= upperBound, largestGap, Ceiling[len / 2]];
 
-    lowerBound = Ceiling[p/2*len];
-    upperBound = Ceiling[(1 - p/2)*len];
-    largestGap = Last[Ordering[separations]];
-    splitLocation =
-        If[lowerBound <= largestGap <= upperBound, largestGap,
-          Ceiling[len/2]
-        ];
+      leftIndex = order[[;; splitLocation]];
+      rightIndex = order[[splitLocation + 1 ;;]];
 
-    leftIndex = order[[;; splitLocation]];
-    rightIndex = order[[splitLocation + 1 ;;]];
+      leftCluster = cluster[[leftIndex]];
+      rightCluster = cluster[[rightIndex]];
 
-    leftCluster = cluster[[leftIndex]];
-    rightCluster = cluster[[rightIndex]];
+      leftAddress = address * 2;
+      rightAddress = address * 2 + 1;
 
-    leftAddress = address*2;
-    rightAddress = address*2 + 1;
-
-    PartitionCluster[leftAddress, leftCluster, limit, p];
-    PartitionCluster[rightAddress, rightCluster, limit, p];
-
+      PartitionCluster[leftAddress, leftCluster, limit, p];
+      PartitionCluster[rightAddress, rightCluster, limit, p];
+    )
   ];
 
 ];
@@ -124,7 +122,7 @@ ClusterDistanceC =
             m2 = Mean[shift2];
             a = m2 - m1;
             norm = Norm[a];
-            normalized = a/norm;
+            normalized = a / norm;
             axis = {#} & /@ normalized;
             axisT = Transpose[axis];
             projectedDown1 = shift1.axis;
@@ -134,26 +132,20 @@ ClusterDistanceC =
 
             errors1 =
                 Table[Module[{projectionDistance, centerDistance, error},
-                  projectionDistance =
-                      Norm[(v - offset) - (v - offset).axis.axisT];
-                  centerDistance =
-                      Max[p1 - (v - offset).axis, (v - offset).axis - p2];
+                  projectionDistance = Norm[(v - offset) - (v - offset).axis.axisT];
+                  centerDistance = Max[p1 - (v - offset).axis, (v - offset).axis - p2];
                   error = Norm[{centerDistance, projectionDistance}];
-                  Prepend[v, error]
-                ], {v, trimmed1}];
+                  Prepend[v, error]], {v, trimmed1}];
 
             errors2 =
                 Table[Module[{projectionDistance, centerDistance, error},
-                  projectionDistance =
-                      Norm[(v - offset) - (v - offset).axis.axisT];
-                  centerDistance =
-                      Max[p1 - (v - offset).axis, (v - offset).axis - p2];
+                  projectionDistance = Norm[(v - offset) - (v - offset).axis.axisT];
+                  centerDistance = Max[p1 - (v - offset).axis, (v - offset).axis - p2];
                   error = Norm[{centerDistance, projectionDistance}];
-                  Prepend[v, error]
-                ], {v, trimmed2}];
+                  Prepend[v, error]], {v, trimmed2}];
 
-            len1 = Ceiling[Length[trimmed1]/2];
-            len2 = Ceiling[Length[trimmed2]/2];
+            len1 = Ceiling[Length[trimmed1] / 2];
+            len2 = Ceiling[Length[trimmed2] / 2];
             trimmed1 = SortBy[errors1, First][[;; len1, 2 ;; dim + 1]];
             trimmed2 = SortBy[errors2, First][[;; len2, 2 ;; dim + 1]];
           ];
@@ -188,10 +180,7 @@ ComputeTreeDistances[current_, queue_, opts : OptionsPattern[]] :=
       Sow /@ queuePaired;
 
       (* keep close neighbors *)
-      keepQueue =
-          Select[queue,
-            ClusterDistance[current, #] <
-                clusterDiameter*neighborhoodScale &];
+      keepQueue = Select[queue, ClusterDistance[current, #] < clusterDiameter * neighborhoodScale &];
 
       (* get left and right node numbers *)
       nextLeft = GoDownL[current];
@@ -203,10 +192,8 @@ ComputeTreeDistances[current_, queue_, opts : OptionsPattern[]] :=
       pairExistsQ = leftExistsQ && rightExistsQ;
 
       (* add them to the new queues if both exist *)
-      leftQueue =
-          If[pairExistsQ, Append[keepQueue, nextRight], keepQueue];
-      rightQueue =
-          If[pairExistsQ, Append[keepQueue, nextLeft], keepQueue];
+      leftQueue = If[pairExistsQ, Append[keepQueue, nextRight], keepQueue];
+      rightQueue = If[pairExistsQ, Append[keepQueue, nextLeft], keepQueue];
 
       (* recursively descend if child nodes exist *)
       If[leftExistsQ, ComputeTreeDistances[nextLeft, leftQueue, opts]];
