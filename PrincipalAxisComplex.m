@@ -18,7 +18,7 @@ BeginPackage["PrincipalAxisComplex`"]
 GetPrincipalAxis     :: usage = ""
 MakeTree             :: usage = ""
 AverageClusterRadius :: usage = ""
-ClusterDistanceC     :: usage = ""
+ClusterDistance      :: usage = ""
 ComputeTreeDistances :: usage = ""
 
 Begin["`Private`"] (* Begin Private Context *)
