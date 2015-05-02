@@ -15,6 +15,12 @@
 BeginPackage["PrincipalAxisComplex`"]
 (* Exported symbols added here with SymbolName::usage *)
 
+GetPrincipalAxis     :: usage = ""
+MakeTree             :: usage = ""
+AverageClusterRadius :: usage = ""
+ClusterDistanceC     :: usage = ""
+ComputeTreeDistances :: usage = ""
+
 Begin["`Private`"] (* Begin Private Context *)
 
 Reset[] := (
