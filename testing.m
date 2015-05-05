@@ -130,10 +130,8 @@ taskRelationSmooth[featureFunction_, id_] :=
       img = getProcessedFile[id];
       features = featureFunction[img];
       smooth = inverseSigmoid[lookup[id]["smooth"]["smooth"]];
-      featuresOrDisk =
-          inverseSigmoid[lookup[id]["smooth"]["featuresOrDisk"]];
-      starOrArtifact =
-          inverseSigmoid[lookup[id]["smooth"]["starOrArtifact"]];
+      featuresOrDisk = inverseSigmoid[lookup[id]["smooth"]["featuresOrDisk"]];
+      starOrArtifact = inverseSigmoid[lookup[id]["smooth"]["starOrArtifact"]];
       features -> {smooth, featuresOrDisk, starOrArtifact}
     ]
 
@@ -144,39 +142,48 @@ DumpSave["E:\\GDrive\\Classes\\Machine Learning\\project\\data\\getProcessedFile
 
 trueClassification[id_, task_] := Last[SortBy[Keys[lookup[id][task]], lookup[id][task]]]
 
-testClassifier[featureFunction_, c_, id_] := Module[{img},
-  img = featureFunction[getProcessedFile[id]];
-  {c[img], trueClassification[id, "smooth"]}
-]
+testClassifier[featureFunction_, c_, id_] :=
+    Module[{img},
+      img = featureFunction[getProcessedFile[id]];
+      {c[img], trueClassification[id, "smooth"]}
+    ]
 
-assesFeatureFunction[featureFunction_, trainingSetSize_, sampleCount_, sampleSize_, method_, parallel_] := Module[
-  {time, dataSample, lookupSample, linked, c, validationSampleKeys, validationSampleValues, validationSampleImages, validationSamples, correct, ci, mean},
-  time = First[AbsoluteTiming[
-    dataSample = RandomSample[data, trainingSetSize];
-    lookupSample = Association[loadStruct /@ dataSample];
+assesFeatureFunction[featureFunction_, trainingSetSize_, sampleCount_, sampleSize_, method_, parallel_] :=
+    Module[
+      {
+        time, dataSample, lookupSample, linked, c,
+        validationSampleKeys, validationSampleValues, validationSampleImages, validationSamples,
+        correct, ci, mean
+      },
+      time = First[AbsoluteTiming[
+        dataSample = RandomSample[data, trainingSetSize];
+        lookupSample = Association[loadStruct /@ dataSample];
 
-    linked = featureFunction[getProcessedFile[#]] -> Last[SortBy[Keys[lookupSample[#]["smooth"]], lookupSample[#]["smooth"]]]& /@ Keys[lookupSample];
-    c = Classify[linked, Method -> method];
+        linked = featureFunction[getProcessedFile[#]] ->
+            Last[SortBy[Keys[lookupSample[#]["smooth"]], lookupSample[#]["smooth"]]]& /@ Keys[lookupSample];
 
-    validationSampleKeys = Table[RandomSample[Keys[lookup], sampleSize], {sampleCount}];
-    validationSampleValues = Map[trueClassification[#, "smooth"]&, validationSampleKeys, {2}];
-    validationSampleImages = Map[getProcessedFile, validationSampleKeys, {2}];
-    validationSamples = Transpose[{validationSampleKeys, validationSampleValues, validationSampleImages}, {3, 1, 2}];
+        c = Classify[linked, Method -> method];
 
-    correct = Flatten[If[parallel, ParallelTable, Table][Module[{validationSampleIDs, predictedValues, trueValues, images, correctCount},
-      validationSampleIDs = validationSample[[All, 1]];
-      trueValues = validationSample[[All, 2]];
-      images = validationSample[[All, 3]];
-      predictedValues = c[featureFunction[#]]& /@ images;
-      correctCount = Boole[SameQ @@@ Transpose[{predictedValues, trueValues}]]
-    (*N[correctCount/Length[validationSampleIDs]]*)
-    ], {validationSample, validationSamples}]];
+        validationSampleKeys = Table[RandomSample[Keys[lookup], sampleSize], {sampleCount}];
+        validationSampleValues = Map[trueClassification[#, "smooth"]&, validationSampleKeys, {2}];
+        validationSampleImages = Map[getProcessedFile, validationSampleKeys, {2}];
+        validationSamples = Transpose[{validationSampleKeys, validationSampleValues, validationSampleImages}, {3, 1, 2}];
 
-    ci = MeanCI[correct, ConfidenceLevel -> 0.99];
-    mean = Mean[N[correct]];
-  ]];
-  {c, mean, ci, time}
-]
+        correct = Flatten[If[parallel, ParallelTable, Table][Module[
+          {validationSampleIDs, predictedValues, trueValues, images, correctCount},
+          validationSampleIDs = validationSample[[All, 1]];
+          trueValues = validationSample[[All, 2]];
+          images = validationSample[[All, 3]];
+          predictedValues = c[featureFunction[#]]& /@ images;
+          correctCount = Boole[SameQ @@@ Transpose[{predictedValues, trueValues}]]
+        (*N[correctCount/Length[validationSampleIDs]]*)
+        ], {validationSample, validationSamples}]];
+
+        ci = MeanCI[correct, ConfidenceLevel -> 0.99];
+        mean = Mean[N[correct]];
+      ]];
+      {c, mean, ci, time}
+    ]
 
 (* feature functions *)
 luminance[img_] := ImageAdjust[ColorSeparate[ColorConvert[img, "LUV"]][[1]]]
@@ -193,7 +200,7 @@ blue[img_] := ImageAdjust[ColorSeparate[img][[3]]]
 
 kldGradients[img_] := ColorCombine[(ImageAdjust /@ KarhunenLoeveDecomposition[ColorConvert[#, "Grayscale"]& /@ Join[ColorSeparate[ColorConvert[img, "LUV"]], Table[ImageAdjust[GradientFilter[img, i]], {i, 1, 8, 3}]]][[1]])[[;; 3]]]
 
-functions = {luminance, chrominance1, chrominance2, grayscale, red, green, blue, gradient1, gradient2, gradient3, gradient4, ImageSaliencyFilter};
+functions = {luminance, chrominance1, chrominance2, grayscale, red, green, blue, gradient1, gradient2, gradient3, gradient4};
 methods = {"LogisticRegression", "NaiveBayes", "NearestNeighbors", "RandomForest", "SupportVectorMachine"};
 
 trainingSetSize = 200;
