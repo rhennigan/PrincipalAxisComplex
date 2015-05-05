@@ -76,7 +76,11 @@ PartitionCluster[address_, cluster_List, limit_, p_] := Module[
       lowerBound = Ceiling[p / 2 * len];
       upperBound = Ceiling[(1 - p / 2) * len];
       largestGap = Last[Ordering[separations]];
-      splitLocation = If[lowerBound <= largestGap <= upperBound, largestGap, Ceiling[len / 2]];
+      splitLocation =
+          If[lowerBound <= largestGap <= upperBound,
+            largestGap,
+            Ceiling[len / 2]
+          ];
 
       leftIndex = order[[;; splitLocation]];
       rightIndex = order[[splitLocation + 1 ;;]];
