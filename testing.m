@@ -225,3 +225,127 @@ Row[{
 (* function time *)
   TableForm[SortBy[{#, Function[f, Mean[Select[testResultsF, #[[2]] == ToString[f]&][[All, 3, 4]]]][#]}& /@ functions, Last], TableHeadings -> {None, {"Function", "Time (s)"}}]
 }]
+
+$PerseusPath = FileNameJoin[{NotebookDirectory[], "perseus"}];
+persistence[steps_, featureFunction_, img_] := Module[
+  {k, w, h, cwComplexData, cwComplexString, imgOut0, imgOut1, barcodes0, subsetBarcodes0, barcodes1, subsetBarcodes1},
+  k = ToString[$KernelID];
+  {w, h} = ImageDimensions[img];
+  cwComplexData = Flatten[Floor[1 + steps - steps * Rescale[ImageData[ColorConvert[featureFunction[img], "Grayscale"]]]]];
+  cwComplexString = StringJoin[
+    "2", "\n",
+    ToString[w], "\n",
+    ToString[h], "\n",
+    Riffle[ToString /@ cwComplexData, "\n"]
+  ];
+  Export[FileNameJoin[{$PerseusPath, "perseusInput" <> k}], cwComplexString, "TEXT"];
+  SetDirectory[$PerseusPath];
+  Get["!perseusWin.exe cubtop perseusInput" <> k <> " perseusOutput" <> k] // Quiet;
+  imgOut0 = ConstantArray[0, {h, w}];
+  imgOut1 = ConstantArray[0, {h, w}];
+  barcodes0 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PerseusPath, "perseusOutput" <> k <> "_0.txt"}]]], 2] /. (-1 -> steps);
+  subsetBarcodes0 = SortBy[barcodes0, #[[1]] - #[[2]]&][[;; Min[steps, Length[barcodes0]]]];
+  barcodes1 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PerseusPath, "perseusOutput" <> k <> "_1.txt"}]]], 2] /. (-1 -> steps);
+  subsetBarcodes1 = SortBy[barcodes1, #[[1]] - #[[2]]&][[;; Min[steps, Length[barcodes1]]]];
+
+  Do[Module[{b1, b2, len},
+    {b1, b2} = subsetBarcodes0[[i]];
+    len = b2 - b1;
+    imgOut0[[i, Max[1, b1] ;; Min[w, b2]]] = 1
+  ], {i, Length[subsetBarcodes0]}];
+
+  Do[Module[{b1, b2, len},
+    {b1, b2} = subsetBarcodes1[[i]];
+    len = b2 - b1;
+    imgOut1[[Min[h, Max[1, h - i + 1]], Max[1, w - b2 + 1] ;; Min[w, w - b1 + 1]]] = 1
+  ], {i, Length[subsetBarcodes1]}];
+
+  (* clean up temp files *)
+  (*DeleteFile[FileNameJoin[{$PerseusPath,"perseusInput"<>k}]];
+DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_0.txt"}]];
+DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_1.txt"}]];
+DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_2.txt"}]];
+DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_betti.txt"}]];*)
+
+  ColorCombine[{Image[imgOut0], Image[imgOut1]}]
+]
+
+(* feature functions *)
+identity = Identity;
+luma[img_] := ImageAdjust[ColorSeparate[ColorConvert[img, "LUV"]][[1]]]
+chrominance1[img_] := ImageAdjust[ColorSeparate[ColorConvert[img, "LUV"]][[2]]]
+chrominance2[img_] := ImageAdjust[ColorSeparate[ColorConvert[img, "LUV"]][[3]]]
+grayscale[img_] := ColorConvert[img, "Grayscale"]
+gradient1[img_] := ImageAdjust[GradientFilter[img, 1]]
+gradient2[img_] := ImageAdjust[GradientFilter[img, 2]]
+gradient3[img_] := ImageAdjust[GradientFilter[img, 3]]
+gradient4[img_] := ImageAdjust[GradientFilter[img, 4]]
+red[img_] := ImageAdjust[ColorSeparate[img][[1]]]
+green[img_] := ImageAdjust[ColorSeparate[img][[2]]]
+blue[img_] := ImageAdjust[ColorSeparate[img][[3]]]
+gabor2x[img_] := ImageAdjust[GaborFilter[img, 2, {1, 0}]]
+gabor2y[img_] := ImageAdjust[GaborFilter[img, 2, {0, 1}]]
+gabor3x[img_] := ImageAdjust[GaborFilter[img, 3, {1, 0}]]
+gabor3y[img_] := ImageAdjust[GaborFilter[img, 3, {0, 1}]]
+gabor4x[img_] := ImageAdjust[GaborFilter[img, 4, {1, 0}]]
+gabor4y[img_] := ImageAdjust[GaborFilter[img, 4, {0, 1}]]
+gabor8x[img_] := ImageAdjust[GaborFilter[img, 8, {1, 0}]]
+gabor8y[img_] := ImageAdjust[GaborFilter[img, 8, {0, 1}]]
+corner2[img_] := ImageAdjust[CornerFilter[img, 2]]
+corner3[img_] := ImageAdjust[CornerFilter[img, 3]]
+corner4[img_] := ImageAdjust[CornerFilter[img, 4]]
+ridge2[img_] := ImageAdjust[RidgeFilter[img, 2]]
+ridge3[img_] := ImageAdjust[RidgeFilter[img, 3]]
+ridge4[img_] := ImageAdjust[RidgeFilter[img, 4]]
+laplacianGaussianFilter1[img_] := ImageAdjust[LaplacianGaussianFilter[img, 1]]
+laplacianGaussianFilter2[img_] := ImageAdjust[LaplacianGaussianFilter[img, 2]]
+laplacianGaussianFilter3[img_] := ImageAdjust[LaplacianGaussianFilter[img, 3]]
+laplacian1[img_] := ImageAdjust[LaplacianFilter[img, 1]]
+laplacian2[img_] := ImageAdjust[LaplacianFilter[img, 2]]
+
+binList10[img_] := Module[{gimg = gradient3[img]},
+  Table[DeleteSmallComponents[Erosion[Binarize[gimg, FindThreshold[img, Method -> {"BlackFraction", t}]], 1]], {t, .8, .995, .02}]
+]
+
+binList20[img_] := Module[{gimg = gradient3[img]},
+  Table[DeleteSmallComponents[Erosion[Binarize[gimg, FindThreshold[img, Method -> {"BlackFraction", t}]], 1]], {t, .8, .995, .01}]
+]
+
+binList40[img_] := Module[{gimg = gradient3[img]},
+  Table[DeleteSmallComponents[Erosion[Binarize[gimg, FindThreshold[img, Method -> {"BlackFraction", t}]], 1]], {t, .8, .9975, .005}]
+]
+
+morphologicalEulerNumbers10[img_] := MorphologicalEulerNumber /@ binList10[img]
+morphologicalEulerNumbers20[img_] := MorphologicalEulerNumber /@ binList20[img]
+morphologicalEulerNumbers40[img_] := MorphologicalEulerNumber /@ binList40[img]
+
+gradient2Persistence[img_] := persistence[64, gradient2, img]
+gradient3Persistence[img_] := persistence[64, gradient3, img]
+gradient4Persistence[img_] := persistence[64, gradient4, img]
+
+allFeatures[img_] := ImageAdjust /@ KarhunenLoeveDecomposition[ImageAdjust /@ Flatten[ColorSeparate /@ Flatten[{
+  ColorConvert[img, "LUV"],
+  ColorConvert[img, "RGB"],
+  Table[GradientFilter[img, i], {i, 1, 5, 2}],
+  Table[CornerFilter[img, i], {i, 2, 4, 1}],
+  Table[RidgeFilter[img, i], {i, 2, 4, 1}],
+  ImagePeriodogram[img],
+  Table[LaplacianGaussianFilter[img, i], {i, 2, 4, 1}]
+}]]][[1]]
+
+kldCombined[img_] := ColorCombine[allFeatures[img][[;; 3]]]
+
+kldGradients[img_] := ColorCombine[(ImageAdjust /@ KarhunenLoeveDecomposition[ColorConvert[#, "Grayscale"]& /@ Join[ColorSeparate[ColorConvert[img, "LUV"]], Table[ImageAdjust[GradientFilter[img, i]], {i, 1, 8, 3}]]][[1]])[[;; 3]]]
+
+functions = SortBy[{Identity, luma, grayscale, gradient2, gradient4, gabor2x, gabor2y, gabor4x, gabor4y, corner2, corner4, ridge2, ridge4, laplacianGaussianFilter1, laplacianGaussianFilter2, laplacianGaussianFilter3, laplacian1, laplacian2, gradient2Persistence, gradient3Persistence, gradient4Persistence}, ToString];
+
+methods = Sort[{
+  "LogisticRegression",
+  "NaiveBayes",
+  {"NearestNeighbors", "NeighborsNumber" -> 25},
+  {"NearestNeighbors", "NeighborsNumber" -> 50},
+  {"NearestNeighbors", "NeighborsNumber" -> 100},
+  {"RandomForest", "TreeNumber" -> 50, "LeafSize" -> 5},
+  {"RandomForest", "TreeNumber" -> 100, "LeafSize" -> 10},
+  {"RandomForest", "TreeNumber" -> 200, "LeafSize" -> 20}
+}];
