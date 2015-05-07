@@ -24,6 +24,7 @@ ComputeTreeDistances :: usage = ""
 Begin["`Private`"] (* Begin Private Context *)
 
 $PathToJavaPlex = FileNameJoin[{NotebookDirectory[], "javaplex"}];
+$PathToPerseus  = FileNameJoin[{NotebookDirectory[], "perseus"}];
 
 Reset[] := (
   Clear[GetCluster, GetAddress, GetPoint];

@@ -3,6 +3,7 @@
 (* :Author: rhennigan *)
 (* :Date: 5/4/2015 *)
 
+Needs["PrincipalAxisComplex`"]
 Needs["HypothesisTesting`"]
 
 selectGalaxy[img_, t_] := SelectComponents[FillingTransform @ Binarize[img, t], "Area", -1]
@@ -226,7 +227,6 @@ Row[{
   TableForm[SortBy[{#, Function[f, Mean[Select[testResultsF, #[[2]] == ToString[f]&][[All, 3, 4]]]][#]}& /@ functions, Last], TableHeadings -> {None, {"Function", "Time (s)"}}]
 }]
 
-$PerseusPath = FileNameJoin[{NotebookDirectory[], "perseus"}];
 persistence[steps_, featureFunction_, img_] := Module[
   {k, w, h, cwComplexData, cwComplexString, imgOut0, imgOut1, barcodes0, subsetBarcodes0, barcodes1, subsetBarcodes1},
   k = ToString[$KernelID];
@@ -238,14 +238,14 @@ persistence[steps_, featureFunction_, img_] := Module[
     ToString[h], "\n",
     Riffle[ToString /@ cwComplexData, "\n"]
   ];
-  Export[FileNameJoin[{$PerseusPath, "perseusInput" <> k}], cwComplexString, "TEXT"];
-  SetDirectory[$PerseusPath];
+  Export[FileNameJoin[{$PathToPerseus, "perseusInput" <> k}], cwComplexString, "TEXT"];
+  SetDirectory[$PathToPerseus];
   Get["!perseusWin.exe cubtop perseusInput" <> k <> " perseusOutput" <> k] // Quiet;
   imgOut0 = ConstantArray[0, {h, w}];
   imgOut1 = ConstantArray[0, {h, w}];
-  barcodes0 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PerseusPath, "perseusOutput" <> k <> "_0.txt"}]]], 2] /. (-1 -> steps);
+  barcodes0 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PathToPerseus, "perseusOutput" <> k <> "_0.txt"}]]], 2] /. (-1 -> steps);
   subsetBarcodes0 = SortBy[barcodes0, #[[1]] - #[[2]]&][[;; Min[steps, Length[barcodes0]]]];
-  barcodes1 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PerseusPath, "perseusOutput" <> k <> "_1.txt"}]]], 2] /. (-1 -> steps);
+  barcodes1 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PathToPerseus, "perseusOutput" <> k <> "_1.txt"}]]], 2] /. (-1 -> steps);
   subsetBarcodes1 = SortBy[barcodes1, #[[1]] - #[[2]]&][[;; Min[steps, Length[barcodes1]]]];
 
   Do[Module[{b1, b2, len},
@@ -260,15 +260,31 @@ persistence[steps_, featureFunction_, img_] := Module[
     imgOut1[[Min[h, Max[1, h - i + 1]], Max[1, w - b2 + 1] ;; Min[w, w - b1 + 1]]] = 1
   ], {i, Length[subsetBarcodes1]}];
 
-  (* clean up temp files *)
-  (*DeleteFile[FileNameJoin[{$PerseusPath,"perseusInput"<>k}]];
-DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_0.txt"}]];
-DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_1.txt"}]];
-DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_2.txt"}]];
-DeleteFile[FileNameJoin[{$PerseusPath,"perseusOutput"<>k<>"_betti.txt"}]];*)
-
   ColorCombine[{Image[imgOut0], Image[imgOut1]}]
 ]
+
+persistence2[steps_, featureFunction_, img_] := Module[
+  {k, w, h, src, cwComplexData, cwComplexString, barcodes0, barcodes1, arr, i0, i1},
+  k = ToString[$KernelID];
+  {w, h} = ImageDimensions[img];
+  src = ColorConvert[featureFunction[img], "Grayscale"];
+  cwComplexData = Flatten[Floor[1 + steps - steps * Rescale[ImageData[src]]]];
+  cwComplexString = StringJoin[
+    "2", "\n",
+    ToString[w], "\n",
+    ToString[h], "\n",
+    Riffle[ToString /@ cwComplexData, "\n"]
+  ];
+  Export[FileNameJoin[{$PathToPerseus, "perseusInput" <> k}], cwComplexString, "TEXT"];
+  SetDirectory[$PathToPerseus];
+  Get["!perseusWin.exe cubtop perseusInput" <> k <> " perseusOutput" <> k] // Quiet;
+  barcodes0 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PathToPerseus, "perseusOutput" <> k <> "_0.txt"}]]], 2] /. (-1 -> w);
+  barcodes1 = Partition[ToExpression /@ StringSplit[Import[FileNameJoin[{$PathToPerseus, "perseusOutput" <> k <> "_1.txt"}]]], 2] /. (-1 -> w);
+  arr = ConstantArray[0, {64, 64}];
+  i0 = N[Fold[Function[{a, b}, ReplacePart[a, {i_, j_} /; b[[1]] <= i <= b[[2]] && b[[1]] <= j <= b[[2]] :> (a[[i, j]] + b[[2]] - b[[1]])]], arr, barcodes0]];
+  i1 = N[Fold[Function[{a, b}, ReplacePart[a, {i_, j_} /; b[[1]] <= i <= b[[2]] && b[[1]] <= j <= b[[2]] :> (a[[i, j]] + b[[2]] - b[[1]])]], arr, barcodes1]];
+  ColorCombine[{Image[i0 / Max[i0, i1]], Image[i1 / Max[i0, i1]], src}]
+];
 
 (* feature functions *)
 identity = Identity;
